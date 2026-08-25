@@ -1,27 +1,16 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.venv/
-venv/
-
-# Local application/runtime state
+# Security: never commit local Keeper identity/runtime/export data.
 settings.json
 runtime-v1.txt
 bootstrap.log
-KeeperGroupExport/
-
-# Credential exports
 *.csv
-
-# Editor / OS noise
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 .vscode/
 .idea/
 Thumbs.db
 .DS_Store
-
-# Build / package outputs
 build/
 dist/
 *.spec
