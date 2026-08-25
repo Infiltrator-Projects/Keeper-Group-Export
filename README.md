@@ -2,9 +2,18 @@
 
 Keeper Group Export is a Windows GUI utility for exporting credential records from a selected live Keeper folder to a clean CSV containing only **Student**, **Email**, and **Password**.
 
+## Download
+
+The recommended public download is the GitHub Release **v3.8.0**, which includes:
+
+- `Keeper-Group-Export-v3.8.0.zip`
+- `Keeper-Group-Export-v3.8.0.zip.sha256`
+
+GitHub also provides automatic source-code archives for the tag.
+
 ## Run
 
-Clone or download the repository, keep the files together, then double-click:
+Extract the release package, keep the files together, then double-click:
 
 `Start Keeper Group Export.vbs`
 
@@ -69,6 +78,6 @@ The application does not deliberately persist the Keeper master password. Export
 - Keeper Commander 18.1.2
 - PowerShell / VBScript bootstrap and launcher
 
-Current version: **3.8**
+Current version: **3.8.0**
 
 Keeper and Keeper Commander are products of Keeper Security, Inc. This is an independent utility and not an official Keeper Security product.
