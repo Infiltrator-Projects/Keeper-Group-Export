@@ -1,0 +1,327 @@
+name: Finalize Keeper Group Export 1.0.0
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.head_commit.message == 'Prepare v1.0.0 release automation'
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13 x64
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+          cache: pip
+
+      - name: Finalize 1.0.0 source tree
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $path = 'keeper_group_export/common.py'
+          $text = Get-Content -LiteralPath $path -Raw
+          $text = $text.Replace('APP_VERSION = "3.8"', 'APP_VERSION = "1.0.0"')
+          Set-Content -LiteralPath $path -Value $text -Encoding utf8NoBOM
+
+          $path = 'Keeper-Group-Export-Bootstrap.ps1'
+          $text = Get-Content -LiteralPath $path -Raw
+          $text = $text.Replace('Keeper Group Export v3.8', 'Keeper Group Export 1.0.0')
+          $text = $text.Replace('Keeper-Group-Export-v3.8.pyw', 'Keeper-Group-Export.pyw')
+          Set-Content -LiteralPath $path -Value $text -Encoding utf8NoBOM
+
+          $path = 'Start Keeper Group Export.vbs'
+          $text = Get-Content -LiteralPath $path -Raw
+          $text = $text.Replace('Keeper Group Export v3.8', 'Keeper Group Export 1.0.0')
+          $text = $text.Replace('Keeper-Group-Export-v3.8.pyw', 'Keeper-Group-Export.pyw')
+          Set-Content -LiteralPath $path -Value $text -Encoding utf8NoBOM
+
+          Move-Item -LiteralPath 'Keeper-Group-Export-v3.8.pyw' -Destination 'Keeper-Group-Export.pyw'
+          $path = 'Keeper-Group-Export.pyw'
+          $text = Get-Content -LiteralPath $path -Raw
+          $text = $text.Replace('Keeper Group Export v3.8 entry point.', 'Keeper Group Export 1.0.0 release entry point.')
+          Set-Content -LiteralPath $path -Value $text -Encoding utf8NoBOM
+
+          $path = '.github/workflows/ci.yml'
+          $text = Get-Content -LiteralPath $path -Raw
+          $text = $text.Replace('Keeper-Group-Export-v3.8.pyw', 'Keeper-Group-Export.pyw')
+          $privacyStep = @'
+
+              - name: Enforce release and privacy invariants
+                shell: pwsh
+                run: |
+                  $legacy = Get-ChildItem -Recurse -File -Include *.py,*.pyw,*.ps1,*.vbs,*.md,*.yml,*.txt |
+                    Where-Object { $_.FullName -notmatch '\\.git\\' } |
+                    Select-String -Pattern 'v3\.8|3\.8\.0|Keeper-Group-Export-v3\.8\.pyw'
+                  if ($legacy) {
+                    $legacy | ForEach-Object { Write-Error ("Legacy version reference: {0}:{1}" -f $_.Path, $_.LineNumber) }
+                    exit 1
+                  }
+
+                  $emails = Get-ChildItem keeper_group_export -Recurse -File -Include *.py |
+                    Select-String -Pattern '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+                  if ($emails) {
+                    $emails | ForEach-Object { Write-Error ("Hard-coded email-like value: {0}:{1}" -f $_.Path, $_.LineNumber) }
+                    exit 1
+                  }
+'@
+          $text = $text.TrimEnd() + $privacyStep + "`r`n"
+          Set-Content -LiteralPath $path -Value $text -Encoding utf8NoBOM
+
+          $readme = @'
+          # Keeper Group Export
+
+          Keeper Group Export is a Windows GUI utility for exporting credential records
+          from a selected live Keeper folder to a clean CSV containing only **Student**,
+          **Email**, and **Password**.
+
+          ## Download
+
+          The current stable release is **v1.0.0**. Download the packaged ZIP and its
+          SHA-256 checksum from GitHub Releases.
+
+          ## Run
+
+          Extract the release package, keep the files together, then double-click:
+
+          `Start Keeper Group Export.vbs`
+
+          Normal launches use a previously verified Python runtime directly. On a clean
+          machine the PowerShell bootstrap locates or installs Python 3.13 x64, enforces
+          the pinned Keeper Commander dependency, verifies the runtime, then caches the
+          verified launcher for subsequent fast starts.
+
+          ## Features
+
+          - Keeper login, device approval and 2FA through Keeper Commander's `LoginUi`.
+          - Dynamic discovery of live Keeper folders; no organisational folders are hard-coded.
+          - Student / Email / Password preview and CSV export.
+          - Live preview search and preview-only password masking.
+          - Refresh Vault without forcing a new login.
+          - Remembers the last successful Keeper username locally on that PC only.
+          - Single-pass folder/record indexing after each vault sync.
+          - Fail-closed export if a Keeper record cannot be read.
+          - Professional About screen and programmer credits.
+
+          ## Authentication support
+
+          The application supports Keeper's login/password flow plus the device-approval
+          and 2FA channels implemented in the GUI, including authenticator codes, SMS,
+          Duo, RSA SecurID, Keeper DNA and backup codes where Keeper exposes them.
+
+          **WebAuthn/security-key-only authentication is not currently driven by this
+          Tkinter utility.** If an account exposes only that factor, the application
+          reports the limitation and cancels the login rather than bypassing or weakening
+          the account's security policy.
+
+          ## Source layout
+
+          The stable entry point is `Keeper-Group-Export.pyw`. Focused modules live under
+          `keeper_group_export/`:
+
+          - `app.py` — application composition and local non-secret settings.
+          - `auth_runtime.py` — deferred Keeper import/config handling.
+          - `auth_present.py` — login and authentication-choice presentation.
+          - `auth_flow.py` — Keeper device approval, 2FA and password flow.
+          - `ui_styles.py` / `ui_layout.py` / `ui_helpers.py` / `ui_actions.py` — desktop UI.
+          - `vault.py` — indexed folder discovery, preview and CSV export.
+          - `common.py` — application-local constants and pure helpers.
+
+          `requirements.txt` is the pinned runtime dependency source of truth. Windows CI
+          compiles and imports the modules, runs unit tests, rejects wildcard local
+          imports, parses the PowerShell bootstrap, rejects legacy development-version
+          references, and checks application source for hard-coded email-like values.
+
+          ## Privacy / security
+
+          **No Keeper username, email address, password, token, or vault data is hard-coded
+          or shipped in this repository.**
+
+          A fresh installation starts with a blank username unless that PC already has a
+          locally remembered username from a previous successful login. The remembered
+          username is stored only under:
+
+          `%LOCALAPPDATA%\KeeperGroupExport\settings.json`
+
+          The application does not deliberately persist the Keeper master password.
+          Exported CSV files contain plaintext passwords by design, so they must be treated
+          as sensitive credential material.
+
+          If any Keeper record in the selected folder cannot be read, export is stopped
+          rather than silently writing an incomplete credential list.
+
+          ## Infiltratr Common
+
+          Keeper Group Export is **not currently linked to Infiltratr Common**. Common
+          1.14 is a native C11 library and currently has no supported Python binding for
+          the facilities this application needs. Adding a private FFI layer solely to
+          claim linkage would increase startup time, packaging complexity and failure
+          surface without removing meaningful duplicated logic.
+
+          If Common gains a supported Python consumer interface for a genuinely shared
+          contract used here, Keeper Group Export should pin and consume that interface.
+
+          ## Keyboard shortcuts
+
+          - `Ctrl+F` — focus preview search
+          - `F5` — refresh connected vault
+          - `Ctrl+E` — export selected folder
+          - `F1` — About
+
+          ## Programmers
+
+          - Shannon Smith
+          - Carlo Cunanan
+
+          ## Technology
+
+          - Python 3.13 x64
+          - Tkinter
+          - Keeper Commander 18.1.2
+          - PowerShell / VBScript bootstrap and launcher
+
+          Current stable version: **1.0.0**
+
+          Keeper and Keeper Commander are products of Keeper Security, Inc. This is an
+          independent utility and not an official Keeper Security product.
+          '@
+          $readme = ($readme -split "`r?`n" | ForEach-Object { $_ -replace '^          ', '' }) -join "`r`n"
+          Set-Content -LiteralPath 'README.md' -Value ($readme + "`r`n") -Encoding utf8NoBOM
+
+          Remove-Item -LiteralPath '.github/workflows/finalize-v1.yml' -Force
+
+          $legacy = Get-ChildItem -Recurse -File -Include *.py,*.pyw,*.ps1,*.vbs,*.md,*.yml,*.txt |
+            Where-Object { $_.FullName -notmatch '\\.git\\' } |
+            Select-String -Pattern 'v3\.8|3\.8\.0|Keeper-Group-Export-v3\.8\.pyw'
+          if ($legacy) {
+            $legacy | Format-Table Path, LineNumber, Line -AutoSize
+            throw 'Legacy 3.8 release references remain in the current tree.'
+          }
+
+      - name: Install pinned runtime dependency
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile and import application
+        shell: pwsh
+        run: |
+          python -m compileall -q keeper_group_export tests
+          python -m py_compile Keeper-Group-Export.pyw
+          python -c "import keeper_group_export.app; import keeper_group_export.auth_flow; import keeper_group_export.auth_present; import keeper_group_export.auth_runtime; import keeper_group_export.common; import keeper_group_export.ui_actions; import keeper_group_export.ui_helpers; import keeper_group_export.ui_layout; import keeper_group_export.ui_styles; import keeper_group_export.vault"
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate source hygiene
+        shell: pwsh
+        run: |
+          $wildcards = Get-ChildItem keeper_group_export -Filter *.py |
+            Select-String -SimpleMatch 'from .common import *'
+          if ($wildcards) { throw 'Wildcard local import found.' }
+
+          $emails = Get-ChildItem keeper_group_export -Recurse -File -Include *.py |
+            Select-String -Pattern '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+          if ($emails) { throw 'Hard-coded email-like value found in application source.' }
+
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'Keeper-Group-Export-Bootstrap.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Commit release source to main
+        id: commit
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release Keeper Group Export 1.0.0"
+          $sha = (git rev-parse HEAD).Trim()
+          "release_sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          git push origin HEAD:main
+
+      - name: Build release package
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $env:RUNNER_TEMP 'Keeper-Group-Export-v1.0.0'
+          $zip = Join-Path $env:RUNNER_TEMP 'Keeper-Group-Export-v1.0.0.zip'
+          $shaFile = "$zip.sha256"
+
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item 'Start Keeper Group Export.vbs' $stage
+          Copy-Item 'Keeper-Group-Export-Bootstrap.ps1' $stage
+          Copy-Item 'Keeper-Group-Export.pyw' $stage
+          Copy-Item 'requirements.txt' $stage
+          Copy-Item 'README.md' $stage
+          Copy-Item 'keeper_group_export' $stage -Recurse
+
+          Compress-Archive -Path $stage -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          "$hash  Keeper-Group-Export-v1.0.0.zip" | Set-Content -LiteralPath $shaFile -Encoding ascii
+
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sha_file=$shaFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish v1.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.commit.outputs.release_sha }}
+          ZIP_PATH: ${{ steps.package.outputs.zip }}
+          SHA_PATH: ${{ steps.package.outputs.sha_file }}
+        shell: pwsh
+        run: |
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          @'
+          # Keeper Group Export 1.0.0
+
+          First stable release of Keeper Group Export.
+
+          Highlights:
+          - fast normal startup through the cached Python runtime;
+          - Keeper Commander LoginUi authentication with device approval and supported 2FA channels;
+          - dynamic live-vault folder discovery;
+          - single-pass folder/record indexing;
+          - Student / Email / Password preview and clean CSV export;
+          - preview search and password masking;
+          - remembered username stored locally only after successful sign-in;
+          - fail-closed record export;
+          - professional desktop UI and About screen;
+          - Windows CI, source-hygiene checks and pinned Keeper Commander dependency.
+
+          Security note: exported CSV files contain plaintext passwords and must be protected as credential material.
+
+          WebAuthn/security-key-only authentication is not currently driven by the Tkinter UI.
+          '@ | Set-Content -LiteralPath $notes -Encoding utf8NoBOM
+
+          gh release create v1.0.0 `
+            "$env:ZIP_PATH#Keeper Group Export 1.0.0" `
+            "$env:SHA_PATH#SHA-256 checksum" `
+            --repo '${{ github.repository }}' `
+            --target $env:RELEASE_SHA `
+            --title 'Keeper Group Export 1.0.0' `
+            --notes-file $notes
+
+          if (gh release view v3.8.0 --repo '${{ github.repository }}' 2>$null) {
+            gh release delete v3.8.0 --repo '${{ github.repository }}' --cleanup-tag -y
+          }
