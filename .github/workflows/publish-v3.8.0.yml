@@ -1,0 +1,42 @@
+name: Publish Keeper Group Export v3.8.0
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-v3.8.0.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f Keeper-Group-Export-v3.8.0.zip
+          zip -r Keeper-Group-Export-v3.8.0.zip \
+            'Start Keeper Group Export.vbs' \
+            'Keeper-Group-Export-Bootstrap.ps1' \
+            'Keeper-Group-Export-v3.8.pyw' \
+            keeper_group_export \
+            README.md
+          sha256sum Keeper-Group-Export-v3.8.0.zip > Keeper-Group-Export-v3.8.0.zip.sha256
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v3.8.0 \
+            Keeper-Group-Export-v3.8.0.zip \
+            Keeper-Group-Export-v3.8.0.zip.sha256 \
+            --target main \
+            --title 'Keeper Group Export v3.8.0' \
+            --notes $'First public release of Keeper Group Export.\n\nHighlights:\n- Professional Keeper-inspired Windows GUI\n- Dynamic live Keeper folder discovery\n- Direct Keeper LoginUi authentication with device approval and 2FA\n- Student / Email / Password preview and clean CSV export\n- Preview search and password masking\n- Refresh Vault without reauthentication\n- Python 3.13 x64 bootstrap for managed Windows environments\n- Local remembered username only; no Keeper account email, password, token, or vault data is shipped in the repository\n\nProgrammers: Shannon Smith and Carlo Cunanan.'
