@@ -1,4 +1,4 @@
-' Keeper Group Export v3.8 - fast launcher
+' Keeper Group Export 1.0.0 - fast launcher
 ' ========================================
 '
 ' Normal startup is intentionally just cached pythonw.exe -> GUI. PowerShell,
@@ -13,7 +13,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 
 base = fso.GetParentFolderName(WScript.ScriptFullName)
-appFile = fso.BuildPath(base, "Keeper-Group-Export-v3.8.pyw")
+appFile = fso.BuildPath(base, "Keeper-Group-Export.pyw")
 
 runtimeRoot = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\KeeperGroupExport"
 markerFile = fso.BuildPath(runtimeRoot, "runtime-v2.txt")
@@ -41,3 +41,4 @@ End If
 ps1 = fso.BuildPath(base, "Keeper-Group-Export-Bootstrap.ps1")
 cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & ps1 & """"
 shell.Run cmd, 0, False
+

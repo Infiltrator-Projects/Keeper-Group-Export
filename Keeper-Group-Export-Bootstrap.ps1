@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    First-run/repair bootstrap for Keeper Group Export v3.8.
+    First-run/repair bootstrap for Keeper Group Export 1.0.0.
 
 .DESCRIPTION
     This is intentionally the slow path. Normal launches use the runtime-v2
@@ -41,7 +41,7 @@ $ErrorActionPreference = "Stop"
 
 $AppName = "Keeper Group Export"
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$AppFile = Join-Path $AppDir "Keeper-Group-Export-v3.8.pyw"
+$AppFile = Join-Path $AppDir "Keeper-Group-Export.pyw"
 $RequirementsFile = Join-Path $AppDir "requirements.txt"
 $RuntimeRoot = Join-Path $env:LOCALAPPDATA "KeeperGroupExport"
 $LogFile = Join-Path $RuntimeRoot "bootstrap.log"
@@ -345,3 +345,4 @@ catch {
     )
     exit 1
 }
+

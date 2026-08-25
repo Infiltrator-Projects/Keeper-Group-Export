@@ -8,7 +8,7 @@ Python consumer interface that would improve this utility.
 import re
 
 APP_TITLE = "Keeper Group Export"
-APP_VERSION = "3.8"
+APP_VERSION = "1.0.0"
 APP_SUBTITLE = "Credential Export Utility"
 PROGRAMMERS = ("Shannon Smith", "Carlo Cunanan")
 KEEPER_COMMANDER_VERSION = "18.1.2"
@@ -78,3 +78,4 @@ def build_folder_record_index(folder_cache, direct_record_cache):
         collect(uid)
 
     return memo
+

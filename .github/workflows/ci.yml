@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q keeper_group_export tests
-          python -m py_compile Keeper-Group-Export-v3.8.pyw
+          python -m py_compile Keeper-Group-Export.pyw
 
       - name: Import application modules
         run: >-
@@ -74,3 +74,4 @@ jobs:
             $errors | Format-List | Out-String | Write-Error
             exit 1
           }
+
