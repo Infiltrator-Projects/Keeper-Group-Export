@@ -16,3 +16,5 @@ build/
 dist/
 *.spec
 *.zip
+
+# Release archives are produced by GitHub Actions, not committed to main.
