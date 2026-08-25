@@ -1,24 +1,20 @@
-"""Keeper Group Export auth runtime module."""
+"""Deferred Keeper runtime discovery and configuration loading."""
 
-import csv
 import json
-import logging
 import os
 import queue
-import re
 import threading
 import time
-import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from .common import *
+
+from .common import C_ACCENT, C_DANGER, C_MUTED
+
 
 class AuthRuntimeMixin:
     def _start_runtime_loader(self):
         """Start the single daemon worker responsible for Keeper imports."""
         self.runtime_started_at = time.perf_counter()
-        thread = threading.Thread(target=self._runtime_worker, daemon=True)
-        thread.start()
+        threading.Thread(target=self._runtime_worker, daemon=True).start()
         self.after(75, self._poll_runtime_loader)
 
     def _runtime_worker(self):
@@ -44,19 +40,13 @@ class AuthRuntimeMixin:
             self.runtime_queue.put(("error", exc))
 
     def _poll_runtime_loader(self):
-        """Consume the worker result on Tk's main thread without blocking.
-
-        ``after`` polling keeps the event loop responsive. A blocking thread
-        join would recreate the original startup freeze.
-        """
+        """Consume the worker result on Tk's main thread without blocking."""
         try:
             result = self.runtime_queue.get_nowait()
         except queue.Empty:
             self.after(75, self._poll_runtime_loader)
             return
 
-        # Runtime import failure prevents Keeper operations, but the GUI remains
-        # alive so the operator receives an explicit diagnostic.
         if result[0] == "error":
             self.runtime_error = result[1]
             self.conn_status.config(text="Keeper library failed to load.", fg=C_DANGER)
@@ -65,14 +55,20 @@ class AuthRuntimeMixin:
                 self.login_error.config(text=f"Keeper runtime error: {self.runtime_error}")
             return
 
-        # Transfer imported modules/classes into state owned by the Tk thread.
-        _, self.k_api, self.k_login_steps, self.k_config_loader, self.k_params_class, self.k_platformdirs = result
+        (
+            _,
+            self.k_api,
+            self.k_login_steps,
+            self.k_config_loader,
+            self.k_params_class,
+            self.k_platformdirs,
+        ) = result
         self.runtime_ready = True
 
         elapsed = time.perf_counter() - self.runtime_started_at
         self.conn_status.config(
             text=f"Keeper library ready • {elapsed:.1f}s",
-            fg=C_ACCENT
+            fg=C_ACCENT,
         )
         self._set_status("Keeper library ready", tone="warning")
 
@@ -81,34 +77,27 @@ class AuthRuntimeMixin:
                 text="Connect",
                 state="normal",
                 bg=C_ACCENT,
-                fg="#111111"
+                fg="#111111",
             )
             self.login_hint.config(
                 text="Keeper is ready. Enter your account details.",
-                fg=C_MUTED
+                fg=C_MUTED,
             )
 
-            # If the application has no saved username, populate it from Keeper's
-            # existing configuration without importing the full CLI stack.
+            # If no app-local username exists, reuse Keeper's configured account
+            # when available. This still persists no password or vault material.
             if not self.login_user_var.get().strip():
                 try:
-                    p = self._new_keeper_params()
-                    if p.user:
-                        self.login_user_var.set(p.user)
+                    params = self._new_keeper_params()
+                    if params.user:
+                        self.login_user_var.set(params.user)
                 except Exception:
+                    # Keeper configuration is convenience state; login remains
+                    # usable with a manually-entered username if it is unreadable.
                     pass
 
     def _keeper_data_dir(self):
-        """Resolve Keeper's data directory without importing its CLI entrypoint.
-
-        Precedence mirrors Commander:
-        1. explicit KEEPER_DATA_HOME;
-        2. existing legacy ~/.keeper;
-        3. platform-specific user data + .keeper.
-
-        Reusing Keeper's established data directory allows existing device
-        registration/protected configuration to be reused.
-        """
+        """Resolve Keeper's data directory without importing its CLI entrypoint."""
         keeper_data_home = os.getenv("KEEPER_DATA_HOME")
         if keeper_data_home:
             path = Path(os.path.expanduser(keeper_data_home))
@@ -127,10 +116,8 @@ class AuthRuntimeMixin:
 
         Existing configuration is hydrated through Keeper's own config-storage
         layer because modern Commander may protect fields in the OS keychain.
-
-        Config-load failure falls back to fresh parameters. Keeper can then
-        request device approval normally; a convenience cache must not become a
-        hard availability dependency.
+        Config-load failure falls back to fresh parameters so device approval can
+        proceed normally.
         """
         if not self.runtime_ready:
             raise RuntimeError("Keeper is still loading.")
@@ -143,12 +130,10 @@ class AuthRuntimeMixin:
 
         if config_file.is_file():
             try:
-                with config_file.open("r", encoding="utf-8") as fh:
-                    params.config = json.load(fh)
+                with config_file.open("r", encoding="utf-8") as handle:
+                    params.config = json.load(handle)
                 self.k_config_loader.load_config_properties(params)
-            except Exception:
-                # Login can still proceed with fresh params. Keeper will perform
-                # any device approval required for a new/unknown client.
+            except (OSError, ValueError, TypeError):
                 params.config = {}
 
         if not params.server:

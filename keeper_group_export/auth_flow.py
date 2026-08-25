@@ -1,21 +1,18 @@
-"""Keeper Group Export auth flow module."""
+"""Keeper LoginUi implementation and connected-session transition."""
 
-import csv
-import json
-import logging
-import os
-import queue
-import re
-import threading
-import time
-import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from .common import *
+from tkinter import messagebox, simpledialog
+
+from .common import APP_TITLE, C_DANGER, C_MUTED, C_SUCCESS
+
 
 class AuthFlowMixin:
     def _make_keeper_login_ui(self):
-        """Create Keeper's LoginUi contract using native Tk dialogs."""
+        """Create Keeper's LoginUi contract using native Tk dialogs.
+
+        Keeper remains the authority for authentication, cryptography and token
+        validation. This adapter supplies only operator interaction for each
+        state requested by Keeper's LoginV3 flow.
+        """
         app = self
         steps = self.k_login_steps
 
@@ -32,7 +29,7 @@ class AuthFlowMixin:
                 choice = app._choose_from_list(
                     "Keeper Device Approval",
                     "Keeper needs to approve this computer for this account.",
-                    choices
+                    choices,
                 )
 
                 if choice is None or choice == 4:
@@ -46,7 +43,7 @@ class AuthFlowMixin:
                         messagebox.showerror(
                             "Keeper Device Approval",
                             f"Keeper could not send the approval email.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         return
 
@@ -54,7 +51,7 @@ class AuthFlowMixin:
                         "Keeper Device Approval",
                         "Keeper sent an approval message.\n\n"
                         "Open it and approve this device, then click OK here.",
-                        parent=app
+                        parent=app,
                     )
                     step.resume()
                     return
@@ -66,7 +63,7 @@ class AuthFlowMixin:
                         messagebox.showerror(
                             "Keeper Device Approval",
                             f"Keeper could not send the push notification.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         return
 
@@ -74,7 +71,7 @@ class AuthFlowMixin:
                         "Keeper Device Approval",
                         "Approve the sign-in on an existing Keeper device, then "
                         "click OK here.",
-                        parent=app
+                        parent=app,
                     )
                     step.resume()
                     return
@@ -83,7 +80,7 @@ class AuthFlowMixin:
                     code = simpledialog.askstring(
                         "Keeper Device Approval",
                         "Enter the Keeper device verification code:",
-                        parent=app
+                        parent=app,
                     )
                     if not code:
                         return
@@ -103,56 +100,50 @@ class AuthFlowMixin:
                         "Keeper Device Approval",
                         "Keeper did not accept that verification code."
                         + (f"\n\n{last_error}" if last_error else ""),
-                        parent=app
+                        parent=app,
                     )
                     return
 
-                if choice == 3:
-                    step.resume()
+                step.resume()
 
             def on_two_factor(self, step):
-                channels = list(step.get_channels() or [])
+                channels = list(step.get_channels() or ())
                 if not channels:
                     step.cancel()
                     return
 
                 def describe(channel):
-                    t = channel.channel_type
-                    if t == steps.TwoFactorChannel.Authenticator:
-                        label = "Authenticator app"
-                    elif t == steps.TwoFactorChannel.TextMessage:
-                        label = "SMS"
-                    elif t == steps.TwoFactorChannel.DuoSecurity:
-                        label = "Duo Security"
-                    elif t == steps.TwoFactorChannel.RSASecurID:
-                        label = "RSA SecurID"
-                    elif t == steps.TwoFactorChannel.KeeperDNA:
-                        label = "Keeper DNA"
-                    elif t == steps.TwoFactorChannel.SecurityKey:
-                        label = "Security key / WebAuthn"
-                    elif t == steps.TwoFactorChannel.Backup:
-                        label = "Backup code"
-                    else:
-                        label = "Other factor"
-
+                    labels = {
+                        steps.TwoFactorChannel.Authenticator: "Authenticator app",
+                        steps.TwoFactorChannel.TextMessage: "SMS",
+                        steps.TwoFactorChannel.DuoSecurity: "Duo Security",
+                        steps.TwoFactorChannel.RSASecurID: "RSA SecurID",
+                        steps.TwoFactorChannel.KeeperDNA: "Keeper DNA",
+                        steps.TwoFactorChannel.SecurityKey: "Security key / WebAuthn",
+                        steps.TwoFactorChannel.Backup: "Backup code",
+                    }
+                    label = labels.get(channel.channel_type, "Other factor")
                     details = " ".join(
-                        str(x).strip()
-                        for x in (channel.channel_name, channel.phone)
-                        if x
+                        str(value).strip()
+                        for value in (channel.channel_name, channel.phone)
+                        if value
                     )
                     return f"{label}{(' — ' + details) if details else ''}"
 
+                # Keeper Commander's WebAuthn path requires browser/security-key
+                # handling this Tk utility does not currently implement.
                 usable = [
-                    ch for ch in channels
-                    if ch.channel_type != steps.TwoFactorChannel.SecurityKey
+                    channel
+                    for channel in channels
+                    if channel.channel_type != steps.TwoFactorChannel.SecurityKey
                 ]
 
                 if not usable:
                     messagebox.showerror(
                         "Keeper Two-Factor Authentication",
                         "This account currently offers only a WebAuthn/security-key "
-                        "factor, which this utility does not yet drive.",
-                        parent=app
+                        "factor, which this utility does not yet support.",
+                        parent=app,
                     )
                     step.cancel()
                     return
@@ -160,27 +151,27 @@ class AuthFlowMixin:
                 if len(usable) == 1:
                     channel = usable[0]
                 else:
-                    idx = app._choose_from_list(
+                    index = app._choose_from_list(
                         "Keeper Two-Factor Authentication",
                         "Choose the Keeper verification method:",
-                        [describe(ch) for ch in usable]
+                        [describe(channel) for channel in usable],
                     )
-                    if idx is None:
+                    if index is None:
                         step.cancel()
                         return
-                    channel = usable[idx]
+                    channel = usable[index]
 
                 if channel.channel_type == steps.TwoFactorChannel.TextMessage:
                     try:
                         step.send_push(
                             channel.channel_uid,
-                            steps.TwoFactorPushAction.TextMessage
+                            steps.TwoFactorPushAction.TextMessage,
                         )
                     except Exception as exc:
                         messagebox.showerror(
                             "Keeper Two-Factor Authentication",
                             f"Keeper could not send the SMS code.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         return
 
@@ -188,7 +179,7 @@ class AuthFlowMixin:
                     code = simpledialog.askstring(
                         "Keeper Two-Factor Authentication",
                         f"{describe(channel)}\n\nEnter the Keeper verification code:",
-                        parent=app
+                        parent=app,
                     )
                     if code is None:
                         step.cancel()
@@ -196,7 +187,7 @@ class AuthFlowMixin:
                     if not code.strip():
                         continue
 
-                    # Do not silently extend the remembered-2FA duration.
+                    # Do not silently extend the user's remembered-2FA duration.
                     step.duration = steps.TwoFactorDuration.EveryLogin
 
                     try:
@@ -206,7 +197,7 @@ class AuthFlowMixin:
                         retry = messagebox.askretrycancel(
                             "Keeper Two-Factor Authentication",
                             f"Keeper did not accept that code.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         if not retry:
                             step.cancel()
@@ -225,7 +216,7 @@ class AuthFlowMixin:
                             "Keeper Master Password",
                             f"Enter the master password for {step.username}:",
                             show="•",
-                            parent=app
+                            parent=app,
                         )
 
                     if not password:
@@ -239,14 +230,14 @@ class AuthFlowMixin:
                         retry = messagebox.askretrycancel(
                             "Keeper Sign In",
                             f"Keeper did not accept the password.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         if not retry:
                             step.cancel()
                             return
 
             def on_sso_redirect(self, step):
-                # The utility explicitly asks for a master password, so prefer
+                # The utility explicitly asks for a master password, so use
                 # Keeper's supported alternate master-password path to SSO.
                 step.login_with_password()
 
@@ -257,7 +248,7 @@ class AuthFlowMixin:
                         "Keeper Approval",
                         "Approve the Keeper request on an existing device, then "
                         "click OK here.",
-                        parent=app
+                        parent=app,
                     )
                     step.resume()
                 except Exception:
@@ -267,27 +258,21 @@ class AuthFlowMixin:
                             "Keeper Approval",
                             "Administrator approval is required. Complete it, then "
                             "click OK here.",
-                            parent=app
+                            parent=app,
                         )
                         step.resume()
                     except Exception as exc:
                         messagebox.showerror(
                             "Keeper Approval",
                             f"Keeper could not request the required approval.\n\n{exc}",
-                            parent=app
+                            parent=app,
                         )
                         step.cancel()
 
         return TkLoginUi()
 
     def connect_keeper(self, user):
-        """Authenticate, synchronise the vault and publish connected state.
-
-        v3.7 uses Keeper's stateful LoginUi interface directly instead of
-        ConsoleLoginUi text parsing. This fixes the first-device approval / 2FA
-        path that produced transient errors on Carlo's machine.
-        """
-        self._device_email_sent = False
+        """Authenticate, synchronise the vault and publish connected state."""
         self.conn_status.config(text="Authenticating with Keeper…", fg=C_MUTED)
         self._set_status("Authenticating with Keeper…", tone="info")
         self.update()
@@ -296,8 +281,7 @@ class AuthFlowMixin:
             params = self._new_keeper_params()
             params.user = user
 
-            ui = self._make_keeper_login_ui()
-            self.k_api.login(params, login_ui=ui)
+            self.k_api.login(params, login_ui=self._make_keeper_login_ui())
 
             if not params.session_token:
                 raise RuntimeError(
@@ -318,11 +302,12 @@ class AuthFlowMixin:
 
             self.account_badge.config(
                 text=params.user or user,
-                bg="#243027", fg=C_SUCCESS
+                bg="#243027",
+                fg=C_SUCCESS,
             )
             self.conn_status.config(
                 text=f"Connected • {len(self.folder_by_label)} folders available",
-                fg=C_SUCCESS
+                fg=C_SUCCESS,
             )
             self.reload_btn.config(state="normal")
             self.refresh_btn.config(state="normal")
@@ -344,8 +329,10 @@ class AuthFlowMixin:
                 self.login_error.config(text=str(exc))
                 self._set_status("Keeper sign-in failed", tone="danger")
             else:
+                self.conn_status.config(text="Keeper connection failed", fg=C_DANGER)
+                self._set_status("Keeper connection failed", tone="danger")
                 messagebox.showerror(
                     APP_TITLE,
                     "Could not connect to Keeper.\n\n" + str(exc),
-                    parent=self
+                    parent=self,
                 )

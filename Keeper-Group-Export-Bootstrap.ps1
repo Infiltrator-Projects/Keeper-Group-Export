@@ -1,25 +1,24 @@
 <#
 .SYNOPSIS
-    First-run/repair bootstrap for Keeper Group Export v3.5.
+    First-run/repair bootstrap for Keeper Group Export v3.8.
 
 .DESCRIPTION
-    This is intentionally the slow path. Normal launches are handled directly
-    by the VBScript launcher once a verified runtime is available.
+    This is intentionally the slow path. Normal launches use the runtime-v2
+    marker and start pythonw.exe directly through the VBScript launcher.
 
     Dependency order:
       1. Locate Python 3.13 x64.
       2. Install it with winget when absent.
       3. Verify/repair pip.
-      4. Verify/install keepercommander==18.1.2.
-      5. Smoke-test Keeper Commander + Tkinter.
+      4. Enforce the exact Keeper Commander version in requirements.txt.
+      5. Smoke-test Keeper Commander and Tkinter.
       6. Resolve pythonw.exe.
-      7. Cache its path for future fast launches.
+      7. Cache its path in runtime-v2.txt.
       8. Launch the GUI.
 
-    Native stdout/stderr is captured explicitly. Windows PowerShell can
-    otherwise promote native stderr into a terminating error under
-    $ErrorActionPreference="Stop", hiding the child exit code and producing
-    truncated "Traceback..." diagnostics.
+    Native stdout/stderr is captured explicitly. Windows PowerShell can otherwise
+    promote native stderr into a terminating error under
+    $ErrorActionPreference="Stop", obscuring the child exit code.
 
 .IMPLEMENTATION NOTES
     Python architecture is read from the executable's PE/COFF Machine field,
@@ -30,48 +29,32 @@
       IMAGE_FILE_MACHINE_ARM64 = 0xAA64
 
 .SECURITY
-    This bootstrap never reads or stores Keeper credentials.
+    The bootstrap never reads or stores Keeper credentials.
 
 .DIAGNOSTICS
     %LOCALAPPDATA%\KeeperGroupExport\bootstrap.log
-
-    Successful runtime cache:
-    %LOCALAPPDATA%\KeeperGroupExport\runtime-v1.txt
 #>
 
 param()
 
-# PowerShell-native failures terminate preparation. Native programs are wrapped
-# by Invoke-Native so their exit codes remain explicit data.
 $ErrorActionPreference = "Stop"
 
-# Resolve all package members relative to this script rather than the caller's
-# working directory, so the extracted folder is relocatable as a unit.
 $AppName = "Keeper Group Export"
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AppFile = Join-Path $AppDir "Keeper-Group-Export-v3.8.pyw"
+$RequirementsFile = Join-Path $AppDir "requirements.txt"
 $RuntimeRoot = Join-Path $env:LOCALAPPDATA "KeeperGroupExport"
 $LogFile = Join-Path $RuntimeRoot "bootstrap.log"
-$MarkerFile = Join-Path $RuntimeRoot "runtime-v1.txt"
+$MarkerFile = Join-Path $RuntimeRoot "runtime-v2.txt"
 
 New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
 
 function Log([string]$Text) {
-    <#
-    .SYNOPSIS
-        Append one timestamped diagnostic line.
-    .PARAMETER Text
-        Human-readable bootstrap state or error information.
-    #>
     $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     "$stamp $Text" | Out-File -FilePath $LogFile -Append -Encoding utf8
 }
 
 function Show-Error([string]$Text) {
-    <#
-    .SYNOPSIS
-        Display an operator-visible error while PowerShell itself is hidden.
-    #>
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.MessageBox]::Show(
         $Text,
@@ -82,13 +65,7 @@ function Show-Error([string]$Text) {
 }
 
 function Invoke-Native {
-    <#
-    .SYNOPSIS
-        Execute a native process and return ExitCode/StdOut/StdErr as data.
-    .DESCRIPTION
-        Temporary-file redirection prevents Python/pip stderr from being confused
-        with PowerShell's own error stream.
-    #>
+    <# Execute a native process and return ExitCode/StdOut/StdErr as data. #>
     param(
         [Parameter(Mandatory=$true)][string]$FilePath,
         [string[]]$Arguments = @()
@@ -109,7 +86,6 @@ function Invoke-Native {
 
         $outText = ""
         $errText = ""
-
         if (Test-Path $stdout) {
             $outText = Get-Content -LiteralPath $stdout -Raw -ErrorAction SilentlyContinue
         }
@@ -129,31 +105,16 @@ function Invoke-Native {
 }
 
 function Log-NativeFailure([string]$Stage, $Result) {
-    # Preserve complete native diagnostics in the file log while user-facing
-    # dialogs remain concise.
     Log "$Stage failed with exit code $($Result.ExitCode)."
     if ($Result.StdOut) { Log "$Stage stdout: $($Result.StdOut)" }
     if ($Result.StdErr) { Log "$Stage stderr: $($Result.StdErr)" }
 }
 
 function Get-PeMachine([string]$Path) {
-    <#
-    .SYNOPSIS
-        Read the PE/COFF Machine field from a Windows executable.
-    .RETURNS
-        UInt16 machine value, or $null for a missing/unreadable/non-PE file.
-    .NOTES
-        DOS header offset 0x3C contains e_lfanew.
-        e_lfanew points to "PE\0\0".
-        The COFF Machine field follows that signature.
-    #>
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return $null
-    }
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
 
     $stream = $null
     $reader = $null
-
     try {
         $stream = [System.IO.File]::Open(
             $Path,
@@ -162,17 +123,11 @@ function Get-PeMachine([string]$Path) {
             [System.IO.FileShare]::ReadWrite
         )
         $reader = New-Object System.IO.BinaryReader($stream)
-
-        # Read architecture from file metadata without executing the candidate.
         $stream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
         $peOffset = $reader.ReadInt32()
-
         $stream.Seek($peOffset, [System.IO.SeekOrigin]::Begin) | Out-Null
         $signature = $reader.ReadUInt32()
-        if ($signature -ne 0x00004550) {
-            return $null
-        }
-
+        if ($signature -ne 0x00004550) { return $null }
         return $reader.ReadUInt16()
     }
     catch {
@@ -185,22 +140,16 @@ function Get-PeMachine([string]$Path) {
 }
 
 function Test-X64Python([string]$Path) {
-    # 0x8664 = IMAGE_FILE_MACHINE_AMD64. Host architecture is deliberately
-    # irrelevant because Windows ARM64 can run x64 Python under emulation.
     return ((Get-PeMachine $Path) -eq 0x8664)
 }
 
-function Add-PythonCandidate([System.Collections.Generic.List[string]]$List, [string]$Path) {
-    # Discovery and validation are separate: registry/launcher sources can
-    # contain duplicates, stale paths or ARM64 interpreters.
+function Add-PythonCandidate(
+    [System.Collections.Generic.List[string]]$List,
+    [string]$Path
+) {
     if (-not $Path) { return }
-
-    try {
-        $resolved = [System.IO.Path]::GetFullPath($Path)
-    }
-    catch {
-        return
-    }
+    try { $resolved = [System.IO.Path]::GetFullPath($Path) }
+    catch { return }
 
     if ((Test-Path -LiteralPath $resolved) -and (-not $List.Contains($resolved))) {
         $List.Add($resolved)
@@ -208,19 +157,12 @@ function Add-PythonCandidate([System.Collections.Generic.List[string]]$List, [st
 }
 
 function Find-Python313X64 {
-    <#
-    .SYNOPSIS
-        Locate Python 3.13 whose executable is genuinely AMD64/x64.
-    .DESCRIPTION
-        Search standard per-user installation, PythonCore registry locations,
-        then py.exe. Every candidate is independently PE-verified.
-    #>
     $candidates = New-Object 'System.Collections.Generic.List[string]'
 
-    Add-PythonCandidate $candidates (Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe")
+    Add-PythonCandidate $candidates (
+        Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
+    )
 
-    # Cover per-user and machine registrations. WOW6432Node is included
-    # defensively for enterprise images with unusual registration state.
     $registryKeys = @(
         "HKCU:\Software\Python\PythonCore\3.13\InstallPath",
         "HKLM:\Software\Python\PythonCore\3.13\InstallPath",
@@ -236,12 +178,11 @@ function Find-Python313X64 {
                 }
             }
             catch {
+                # Registry discovery is best-effort; continue to other sources.
             }
         }
     }
 
-    # py.exe is a discovery source, not an authority. Its result still has to
-    # pass PE verification before it can become the selected runtime.
     $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($launcher) {
         $probe = Invoke-Native $launcher.Source @(
@@ -271,19 +212,30 @@ function Find-Python313X64 {
 try {
     Log "Starting prerequisite check."
 
-    # Once selected, $Python is used explicitly for every pip/Keeper command.
-    # Nothing later is allowed to fall back implicitly to PATH.
+    if (-not (Test-Path -LiteralPath $RequirementsFile)) {
+        throw "Pinned dependency file not found: $RequirementsFile"
+    }
+
+    $keeperRequirement = Get-Content -LiteralPath $RequirementsFile |
+        Where-Object { $_ -match '^\s*keepercommander==' } |
+        Select-Object -First 1
+
+    if (-not $keeperRequirement) {
+        throw "requirements.txt does not contain a pinned keepercommander version."
+    }
+
+    $ExpectedKeeperVersion = ($keeperRequirement -split '==', 2)[1].Trim()
+    if (-not $ExpectedKeeperVersion) {
+        throw "Could not parse the pinned Keeper Commander version."
+    }
 
     $Python = Find-Python313X64
 
     if (-not $Python) {
         Log "Python 3.13 x64 not found. Attempting automatic install."
-
-        # winget keeps package identity, source and requested architecture
-        # explicit; avoid an opaque ad-hoc installer download.
         $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue
         if (-not $Winget) {
-            throw "Python 3.13 x64 is required and Windows Package Manager (winget) is not available."
+            throw "Python 3.13 x64 is required and winget is not available."
         }
 
         $install = Invoke-Native $Winget.Source @(
@@ -302,15 +254,13 @@ try {
             throw "Python installation failed. See bootstrap.log for details."
         }
 
-        # Registration/path visibility can lag slightly behind winget completion.
-        # Retry for a bounded period before declaring discovery failure.
         for ($i = 0; $i -lt 20 -and -not $Python; $i++) {
             Start-Sleep -Seconds 1
             $Python = Find-Python313X64
         }
 
         if (-not $Python) {
-            throw "Python 3.13 x64 was installed, but the bootstrap could not locate an x64 python.exe."
+            throw "Python 3.13 x64 was installed, but x64 python.exe was not found."
         }
 
         Log "Python 3.13 x64 installed at $Python."
@@ -319,54 +269,46 @@ try {
         Log "Python 3.13 x64 ready at $Python."
     }
 
-    # Always invoke pip through the selected interpreter; pip.exe on PATH may
-    # belong to a different Python installation.
     $pip = Invoke-Native $Python @("-m", "pip", "--version")
     if ($pip.ExitCode -ne 0) {
         Log-NativeFailure "pip probe" $pip
         Log "pip unavailable or unhealthy. Running ensurepip."
-
-        # ensurepip is the standard-library recovery path and avoids introducing
-        # another downloader just to repair pip.
         $ensurePip = Invoke-Native $Python @("-m", "ensurepip", "--upgrade")
         if ($ensurePip.ExitCode -ne 0) {
             Log-NativeFailure "ensurepip" $ensurePip
             throw "Python installed, but pip could not be prepared. See bootstrap.log."
         }
-
-        $pip = Invoke-Native $Python @("-m", "pip", "--version")
-        if ($pip.ExitCode -ne 0) {
-            Log-NativeFailure "pip recheck" $pip
-            throw "pip is still unavailable after ensurepip. See bootstrap.log."
-        }
     }
 
-    # Test the selected interpreter's ability to execute Keeper Commander,
-    # rather than trusting package metadata from some other environment.
-    $keeper = Invoke-Native $Python @("-m", "keepercommander", "--version")
-    if ($keeper.ExitCode -ne 0) {
-        Log-NativeFailure "Keeper Commander probe" $keeper
-        Log "Keeper Commander missing. Installing version 18.1.2."
+    $keeperVersion = Invoke-Native $Python @(
+        "-c",
+        "import importlib.metadata; print(importlib.metadata.version('keepercommander'), end='')"
+    )
 
-        # Pin the version used during development/testing. An unconstrained
-        # startup-time upgrade would change behaviour outside this app's release.
+    if (
+        $keeperVersion.ExitCode -ne 0 -or
+        $keeperVersion.StdOut.Trim() -ne $ExpectedKeeperVersion
+    ) {
+        if ($keeperVersion.ExitCode -eq 0) {
+            Log "Keeper Commander $($keeperVersion.StdOut.Trim()) found; enforcing $ExpectedKeeperVersion."
+        }
+        else {
+            Log-NativeFailure "Keeper Commander version probe" $keeperVersion
+            Log "Keeper Commander missing; installing pinned runtime dependency."
+        }
+
         $installKeeper = Invoke-Native $Python @(
             "-m", "pip", "install",
             "--disable-pip-version-check",
             "--no-input",
-            "keepercommander==18.1.2"
+            "-r", $RequirementsFile
         )
-
         if ($installKeeper.ExitCode -ne 0) {
             Log-NativeFailure "Keeper Commander installation" $installKeeper
             throw "Keeper Commander installation failed. See bootstrap.log."
         }
-
-        Log "Keeper Commander installed."
     }
 
-    # Smoke-test while stdout/stderr are still visible to the bootstrap. Once
-    # pythonw.exe starts, import failures would otherwise be much less obvious.
     $verify = Invoke-Native $Python @(
         "-c",
         "__import__('keepercommander');__import__('tkinter')"
@@ -376,33 +318,30 @@ try {
         throw "Keeper runtime verification failed. See bootstrap.log."
     }
 
-    if (-not (Test-Path $AppFile)) {
+    if (-not (Test-Path -LiteralPath $AppFile)) {
         throw "Application file not found: $AppFile"
     }
 
-    # pythonw avoids a console on normal GUI launches. Fall back only to the
-    # already-verified python.exe, never to an unrelated pythonw on PATH.
     $PythonW = Join-Path (Split-Path -Parent $Python) "pythonw.exe"
-    if (-not (Test-X64Python $PythonW)) {
-        $PythonW = $Python
-    }
+    if (-not (Test-X64Python $PythonW)) { $PythonW = $Python }
 
-    # Cache only the verified launcher path. The VBS fast path can consume this
-    # in milliseconds without paying PowerShell/pip discovery cost again.
     $PythonW | Out-File -FilePath $MarkerFile -Encoding ascii -Force
     Log "Runtime ready. Cached launcher: $PythonW"
 
-    Start-Process -FilePath $PythonW` -ArgumentList "`"$AppFile`"" -WorkingDirectory $AppDir
+    $launchArgs = '"{0}"' -f $AppFile
+    Start-Process `
+        -FilePath $PythonW `
+        -ArgumentList $launchArgs `
+        -WorkingDirectory $AppDir
+
     exit 0
 }
 catch {
-    # Detailed child-process evidence is already in bootstrap.log; the dialog
-    # remains concise and points the tester to that file.
     Log "ERROR: $($_.Exception.Message)"
     Show-Error(
         "Keeper Group Export could not prepare its runtime.`r`n`r`n" +
-        $_.Exception.Message +
-        "`r`n\r`nLog: $LogFile"
+        "$($_.Exception.Message)`r`n`r`n" +
+        "Log: $LogFile"
     )
     exit 1
 }

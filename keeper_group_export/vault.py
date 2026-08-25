@@ -1,86 +1,58 @@
-"""Keeper Group Export vault module."""
+"""Keeper folder indexing, preview projection and CSV export."""
 
 import csv
-import json
-import logging
 import os
-import queue
 import re
-import threading
-import time
-import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from .common import *
+from tkinter import filedialog, messagebox
+
+from .common import APP_TITLE, build_folder_record_index, safe_filename
+
 
 class VaultMixin:
-    def _descendant_folder_uids(self, root_uid):
-        """Return ``root_uid`` plus every reachable descendant folder UID.
+    def _rebuild_folder_record_index(self):
+        """Build the transitive folder->record index once for the current sync."""
+        if not self.params:
+            self.folder_record_index = {}
+            return
 
-        Keeper folders should be acyclic; ``seen`` is defensive protection
-        against malformed cache state causing unbounded recursion.
-        """
-        result = []
-        seen = set()
-
-        def walk(uid):
-            """Depth-first traversal over Keeper's cached child-folder UID links."""
-            if uid in seen:
-                return
-            seen.add(uid)
-            result.append(uid)
-            folder = self.params.folder_cache.get(uid)
-            if folder:
-                for child_uid in getattr(folder, "subfolders", []) or []:
-                    walk(child_uid)
-
-        walk(root_uid)
-        return result
+        self.folder_record_index = build_folder_record_index(
+            self.params.folder_cache,
+            self.params.subfolder_record_cache,
+        )
 
     def _record_uids_for_folder(self, root_uid):
-        """Return de-duplicated record UIDs for a folder subtree.
-
-        A set is intentional because Keeper records may be linked into multiple
-        folders. Export semantics are one row per underlying Keeper record UID,
-        not one row per folder reference.
-        """
-        record_uids = set()
-        for folder_uid in self._descendant_folder_uids(root_uid):
-            record_uids.update(
-                self.params.subfolder_record_cache.get(folder_uid, set()) or set()
-            )
-        return record_uids
+        """Return the de-duplicated record UIDs in one indexed folder subtree."""
+        if not self.folder_record_index:
+            self._rebuild_folder_record_index()
+        return set(self.folder_record_index.get(root_uid, ()))
 
     def _folder_path(self, folder_uid):
-        """Build a human-readable path by following parent UIDs upward.
+        """Build a human-readable full path by following parent UIDs upward.
 
-        The returned path is presentation metadata only; Keeper operations
-        continue to use the original UID.
+        The path is display metadata only. A defensive ``seen`` set prevents
+        malformed cyclic parent references from hanging the GUI.
         """
         names = []
+        seen = set()
         uid = folder_uid
 
-        while uid in self.params.folder_cache:
+        while uid and uid not in seen and uid in self.params.folder_cache:
+            seen.add(uid)
             folder = self.params.folder_cache[uid]
-            name = getattr(folder, "name", "") or uid
-            names.append(name)
+            names.append(getattr(folder, "name", "") or uid)
             uid = getattr(folder, "parent_uid", None)
-            if not uid:
-                break
 
         names.reverse()
         return "/".join(names)
 
     def _load_folder_list(self):
-        """Rebuild the group selector from the live synchronised folder cache.
+        """Rebuild the selector and its index from the current Keeper caches.
 
-        Only folders whose selected subtree contains records are shown. Full
-        paths disambiguate same-named folders. If even the full label collides, a
-        short UID suffix provides a deterministic UI distinction.
-
-        Record counts include descendants because preview/export also include
-        the complete selected subtree.
+        The subtree record index is computed once here and then reused for every
+        folder count, selection, preview and export until the next vault sync.
         """
+        self._rebuild_folder_record_index()
+
         choices = []
         mapping = {}
 
@@ -88,7 +60,7 @@ class VaultMixin:
             if not uid or not folder:
                 continue
 
-            count = len(self._record_uids_for_folder(uid))
+            count = len(self.folder_record_index.get(uid, ()))
             if count <= 0:
                 continue
 
@@ -96,14 +68,12 @@ class VaultMixin:
             label = f"{path}  ({count})"
 
             if label in mapping:
-                # Full-path collisions should be unusual, but the UID suffix
-                # guarantees the display map remains one-to-one.
                 label = f"{label}  [{uid[:8]}]"
 
             mapping[label] = uid
             choices.append(label)
 
-        choices.sort(key=lambda value: value.casefold())
+        choices.sort(key=str.casefold)
         self.folder_by_label = mapping
         self.group_box["values"] = choices
 
@@ -111,8 +81,8 @@ class VaultMixin:
             self.group_box.config(state="readonly")
             self.export_btn.config(state="normal")
 
-            # Year 3 is only an initial-selection convenience. Available groups
-            # themselves are always discovered dynamically from Keeper.
+            # Year 3 remains only an initial-selection convenience. Folder
+            # availability itself is always derived from the live vault.
             preferred_index = 0
             for index, label in enumerate(choices):
                 plain = re.sub(r"\s+\(\d+\)(?:\s+\[[^\]]+\])?$", "", label)
@@ -128,47 +98,53 @@ class VaultMixin:
             self.folder_info.config(text="No Keeper folders containing records were found.")
 
     def _records_for_selected_folder(self):
-        """Project Keeper records onto Student / Email / Password rows.
+        """Project the selected folder onto Student / Email / Password rows.
 
-        Direct API reads are intentional: Keeper's CSV export schema varies by
-        record type/version, whereas Commander exposes the legacy-compatible
-        title/login/password projection used here.
-
-        A failure to read one record is isolated rather than aborting the whole
-        group. This preserves useful output while keeping the fault boundary at
-        record granularity.
+        Direct Keeper API reads avoid dependence on Keeper's variable CSV schema.
+        A record-read failure aborts the projection rather than silently producing
+        an incomplete credential list.
         """
         if not self.params:
             raise RuntimeError("Not connected to Keeper.")
 
         label = self.group_var.get()
-        uid = self.folder_by_label.get(label)
-        if not uid:
+        folder_uid = self.folder_by_label.get(label)
+        if not folder_uid:
             raise RuntimeError("Choose a Keeper folder first.")
 
         rows = []
+        failures = []
 
-        for record_uid in self._record_uids_for_folder(uid):
+        for record_uid in self._record_uids_for_folder(folder_uid):
             try:
                 record = self.k_api.get_record(self.params, record_uid)
-            except Exception:
-                record = None
+            except Exception as exc:
+                failures.append((record_uid, exc))
+                continue
 
-            if not record:
+            if record is None:
+                failures.append((record_uid, RuntimeError("Keeper returned no record")))
                 continue
 
             student = (getattr(record, "title", "") or "").strip()
             email = (getattr(record, "login", "") or "").strip()
             password = getattr(record, "password", "") or ""
 
-            # Keep partially-complete records visible. Requiring all fields
-            # would hide data-quality problems rather than exposing empty cells.
+            # Preserve partially-complete records so data-quality issues remain
+            # visible instead of being silently dropped.
             if student or email or password:
                 rows.append({
                     "Student": student,
                     "Email": email,
                     "Password": password,
                 })
+
+        if failures:
+            raise RuntimeError(
+                f"Keeper could not read {len(failures)} record(s) in the selected "
+                "folder. Refresh the vault and retry; export was not allowed to "
+                "continue with an incomplete credential set."
+            )
 
         rows.sort(key=lambda row: row["Student"].casefold())
         return rows
@@ -184,20 +160,23 @@ class VaultMixin:
             self.folder_info.config(
                 text=f"{folder_name} • {len(self.rows)} exportable records"
             )
-            self._set_status(f"Loaded {len(self.rows)} records from {folder_name}", tone="success")
+            self._set_status(
+                f"Loaded {len(self.rows)} records from {folder_name}",
+                tone="success",
+            )
 
         except Exception as exc:
             self.rows = []
             self._populate_preview()
             self.folder_info.config(text=str(exc))
             self.metric_count.config(text="—")
+            self._set_status("Could not load selected folder", tone="danger")
 
     def _populate_preview(self):
-        """Render the preview using the current search and privacy controls.
+        """Render preview rows using the current search/privacy controls.
 
         Search and password masking are presentation-only. ``self.rows`` remains
-        the complete authoritative projection for the selected folder, and export
-        always re-reads Keeper independently of these visual filters.
+        the complete current projection and export re-reads Keeper independently.
         """
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -207,7 +186,8 @@ class VaultMixin:
 
         if query:
             self.filtered_rows = [
-                row for row in self.rows
+                row
+                for row in self.rows
                 if query in row["Student"].casefold()
                 or query in row["Email"].casefold()
                 or query in row["Password"].casefold()
@@ -216,11 +196,15 @@ class VaultMixin:
             self.filtered_rows = list(self.rows)
 
         for row in self.filtered_rows:
-            password = "••••••••" if hide_passwords and row["Password"] else row["Password"]
+            password = (
+                "••••••••"
+                if hide_passwords and row["Password"]
+                else row["Password"]
+            )
             self.tree.insert(
                 "",
                 "end",
-                values=(row["Student"], row["Email"], password)
+                values=(row["Student"], row["Email"], password),
             )
 
         total = len(self.rows)
@@ -234,12 +218,7 @@ class VaultMixin:
         self.metric_count.config(text=str(total) if total else "0")
 
     def export_selected(self):
-        """Write the currently selected group to a clean plaintext CSV.
-
-        Records are re-read at save time rather than serialising the last
-        preview blindly. ``utf-8-sig`` is intentional for predictable Excel
-        recognition on Windows.
-        """
+        """Write the currently selected group to a clean plaintext CSV."""
         try:
             rows = self._records_for_selected_folder()
 
@@ -258,32 +237,31 @@ class VaultMixin:
                 initialfile=f"{base_name}-Credentials.csv",
                 defaultextension=".csv",
                 filetypes=[("CSV files", "*.csv")],
-                parent=self
+                parent=self,
             )
 
             if not path:
                 self._set_status("Export cancelled", tone="muted")
                 return
 
-            # newline="" lets csv.DictWriter control line termination and avoids
+            # newline="" delegates newline handling to csv.DictWriter and avoids
             # blank-line artefacts on Windows.
             with open(path, "w", encoding="utf-8-sig", newline="") as handle:
                 writer = csv.DictWriter(
                     handle,
-                    fieldnames=["Student", "Email", "Password"]
+                    fieldnames=["Student", "Email", "Password"],
                 )
                 writer.writeheader()
                 writer.writerows(rows)
 
             self.rows = rows
             self._populate_preview()
-
             self._set_status(f"Exported {len(rows)} records", tone="success")
 
             messagebox.showinfo(
                 APP_TITLE,
                 f"Export complete.\n\n{len(rows)} records written to:\n{path}",
-                parent=self
+                parent=self,
             )
 
         except Exception as exc:
@@ -291,5 +269,5 @@ class VaultMixin:
             messagebox.showerror(
                 APP_TITLE,
                 "Could not export the selected group.\n\n" + str(exc),
-                parent=self
+                parent=self,
             )

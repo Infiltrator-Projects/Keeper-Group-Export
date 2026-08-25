@@ -1,4 +1,3 @@
+# Runtime dependency source of truth for the current release candidate.
 # Keeper Commander owns authentication, cryptography, device approval and vault access.
-# Pin the tested application-level dependency so a clean machine cannot silently
-# change authentication behaviour outside a Keeper Group Export release.
 keepercommander==18.1.2

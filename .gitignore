@@ -1,6 +1,7 @@
 # Security: never commit local Keeper identity/runtime/export data.
 settings.json
 runtime-v1.txt
+runtime-v2.txt
 bootstrap.log
 *.csv
 __pycache__/

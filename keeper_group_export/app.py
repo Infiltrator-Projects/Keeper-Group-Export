@@ -7,20 +7,27 @@ import time
 import tkinter as tk
 from pathlib import Path
 
-from .common import *
-from .ui_styles import UIStylesMixin
-from .ui_layout import UILayoutMixin
-from .ui_helpers import UIHelpersMixin
-from .ui_actions import UIActionsMixin
-from .auth_runtime import AuthRuntimeMixin
-from .auth_present import AuthPresentationMixin
 from .auth_flow import AuthFlowMixin
+from .auth_present import AuthPresentationMixin
+from .auth_runtime import AuthRuntimeMixin
+from .common import APP_TITLE, C_BG
+from .ui_actions import UIActionsMixin
+from .ui_helpers import UIHelpersMixin
+from .ui_layout import UILayoutMixin
+from .ui_styles import UIStylesMixin
 from .vault import VaultMixin
 
 
 class KeeperGroupExporter(
-    UIStylesMixin, UILayoutMixin, UIHelpersMixin, UIActionsMixin,
-    AuthRuntimeMixin, AuthPresentationMixin, AuthFlowMixin, VaultMixin, tk.Tk
+    UIStylesMixin,
+    UILayoutMixin,
+    UIHelpersMixin,
+    UIActionsMixin,
+    AuthRuntimeMixin,
+    AuthPresentationMixin,
+    AuthFlowMixin,
+    VaultMixin,
+    tk.Tk,
 ):
     """Top-level GUI controller and owner of the active Keeper session."""
 
@@ -30,7 +37,7 @@ class KeeperGroupExporter(
 
         self.started_at = time.perf_counter()
 
-        self.title(f"{APP_TITLE} {APP_VERSION}")
+        self.title(APP_TITLE)
         self.geometry("1180x760")
         self.minsize(980, 640)
         self.configure(bg=C_BG)
@@ -39,6 +46,7 @@ class KeeperGroupExporter(
         # fabricated Keeper folders or records are presented before a real sync.
         self.params = None
         self.folder_by_label = {}
+        self.folder_record_index = {}
         self.rows = []
         self.filtered_rows = []
 
@@ -46,7 +54,6 @@ class KeeperGroupExporter(
         self.search_var = tk.StringVar()
         self.hide_passwords_var = tk.BooleanVar(value=False)
         self._login_password = ""
-        self._device_email_sent = False
 
         # Keeper module references are populated only by the deferred import
         # worker. This is the central fast-start design decision.
@@ -57,6 +64,7 @@ class KeeperGroupExporter(
         self.k_platformdirs = None
         self.runtime_ready = False
         self.runtime_error = None
+
         # The worker communicates with Tk exclusively through this thread-safe
         # queue; Tk itself is never touched from the background thread.
         self.runtime_queue = queue.Queue()
@@ -81,29 +89,22 @@ class KeeperGroupExporter(
         return root / "settings.json"
 
     def _read_last_user(self):
-        """Read the last-used username without making startup depend on it.
-
-        Corrupt/missing settings are treated as an empty cache because this file
-        is ergonomic state, not authentication state.
-        """
+        """Read the last-used username without making startup depend on it."""
         try:
             data = json.loads(self._settings_path().read_text(encoding="utf-8"))
             return (data.get("last_user") or "").strip()
-        except Exception:
+        except (OSError, ValueError, TypeError):
             return ""
 
     def _write_last_user(self, user):
-        """Persist only the username from the last successful connection.
-
-        Failure is intentionally non-fatal; inability to remember a username
-        must not prevent Keeper access or export.
-        """
+        """Persist only the username from the last successful connection."""
         try:
             self._settings_path().write_text(
                 json.dumps({"last_user": user}, indent=2),
-                encoding="utf-8"
+                encoding="utf-8",
             )
-        except Exception:
+        except OSError:
+            # This file is ergonomic state, not an authentication dependency.
             pass
 
 

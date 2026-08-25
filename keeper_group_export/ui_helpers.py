@@ -1,17 +1,7 @@
-"""Keeper Group Export ui helpers module."""
+"""Small presentation helpers and keyboard-shortcut guards."""
 
-import csv
-import json
-import logging
-import os
-import queue
-import re
-import threading
-import time
-import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from .common import *
+from .common import C_DANGER, C_INFO, C_MUTED, C_SUCCESS, C_WARNING
+
 
 class UIHelpersMixin:
     def _set_status(self, text, *, tone="muted"):
@@ -38,11 +28,8 @@ class UIHelpersMixin:
 
     def _shortcut_export(self):
         """Execute export only when the export control is currently available."""
-        try:
-            if str(self.export_btn["state"]) != "disabled":
-                self.export_selected()
-        except Exception:
-            pass
+        if str(self.export_btn["state"]) != "disabled":
+            self.export_selected()
 
     def _shortcut_refresh(self):
         """Refresh the connected vault only when a session exists."""

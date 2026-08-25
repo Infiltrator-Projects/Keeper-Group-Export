@@ -1,42 +1,43 @@
-"""Keeper Group Export ui styles module."""
+"""ttk style definitions for the Keeper-inspired desktop presentation."""
 
-import csv
-import json
-import logging
-import os
-import queue
-import re
-import threading
-import time
-import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from .common import *
+from tkinter import ttk
+
+from .common import (
+    C_ACCENT,
+    C_ACCENT_HOVER,
+    C_BG,
+    C_BORDER,
+    C_CARD,
+    C_CARD_ALT,
+    C_INPUT,
+    C_MUTED,
+    C_PANEL,
+    C_PANEL_2,
+    C_SELECTED,
+    C_TEXT,
+)
+
 
 class UIStylesMixin:
     def _build_styles(self):
-        """Configure the deterministic Keeper-inspired ttk presentation.
-
-        ``clam`` is preferred because native Windows ttk themes ignore several
-        colour settings. Theme selection is cosmetic and therefore best-effort.
-        """
-        s = ttk.Style(self)
+        """Configure the deterministic Keeper-inspired ttk presentation."""
+        style = ttk.Style(self)
         try:
-            s.theme_use("clam")
+            style.theme_use("clam")
         except Exception:
+            # Theme availability is cosmetic; keep the active ttk theme.
             pass
 
-        s.configure("Keeper.TFrame", background=C_BG)
-        s.configure("Panel.TFrame", background=C_PANEL)
-        s.configure("Panel2.TFrame", background=C_PANEL_2)
+        style.configure("Keeper.TFrame", background=C_BG)
+        style.configure("Panel.TFrame", background=C_PANEL)
+        style.configure("Panel2.TFrame", background=C_PANEL_2)
+        style.configure("Keeper.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI", 10))
+        style.configure("Title.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI Semibold", 19))
+        style.configure("Section.TLabel", background=C_PANEL, foreground=C_TEXT, font=("Segoe UI Semibold", 11))
+        style.configure("Muted.TLabel", background=C_BG, foreground=C_MUTED, font=("Segoe UI", 9))
+        style.configure("PanelMuted.TLabel", background=C_PANEL, foreground=C_MUTED, font=("Segoe UI", 9))
 
-        s.configure("Keeper.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI", 10))
-        s.configure("Title.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI Semibold", 19))
-        s.configure("Section.TLabel", background=C_PANEL, foreground=C_TEXT, font=("Segoe UI Semibold", 11))
-        s.configure("Muted.TLabel", background=C_BG, foreground=C_MUTED, font=("Segoe UI", 9))
-        s.configure("PanelMuted.TLabel", background=C_PANEL, foreground=C_MUTED, font=("Segoe UI", 9))
-
-        s.configure(
+        style.configure(
             "Accent.TButton",
             background=C_ACCENT,
             foreground="#111111",
@@ -44,29 +45,29 @@ class UIStylesMixin:
             lightcolor=C_ACCENT,
             darkcolor=C_ACCENT,
             font=("Segoe UI Semibold", 10),
-            padding=(14, 8)
+            padding=(14, 8),
         )
-        s.map(
+        style.map(
             "Accent.TButton",
             background=[("active", C_ACCENT_HOVER), ("disabled", "#6a5d1c")],
-            foreground=[("disabled", "#b7ad84")]
+            foreground=[("disabled", "#b7ad84")],
         )
 
-        s.configure(
+        style.configure(
             "Dark.TButton",
             background=C_INPUT,
             foreground=C_TEXT,
             bordercolor=C_BORDER,
             font=("Segoe UI", 10),
-            padding=(12, 8)
+            padding=(12, 8),
         )
-        s.map(
+        style.map(
             "Dark.TButton",
             background=[("active", "#474747"), ("disabled", "#2d2d2d")],
-            foreground=[("disabled", "#777777")]
+            foreground=[("disabled", "#777777")],
         )
 
-        s.configure(
+        style.configure(
             "Keeper.TCombobox",
             fieldbackground=C_INPUT,
             background=C_INPUT,
@@ -75,17 +76,17 @@ class UIStylesMixin:
             bordercolor=C_BORDER,
             lightcolor=C_BORDER,
             darkcolor=C_BORDER,
-            padding=6
+            padding=6,
         )
-        s.map(
+        style.map(
             "Keeper.TCombobox",
             fieldbackground=[("readonly", C_INPUT)],
             foreground=[("readonly", C_TEXT)],
             selectbackground=[("readonly", C_INPUT)],
-            selectforeground=[("readonly", C_TEXT)]
+            selectforeground=[("readonly", C_TEXT)],
         )
 
-        s.configure(
+        style.configure(
             "Keeper.Treeview",
             background=C_PANEL,
             fieldbackground=C_PANEL,
@@ -93,49 +94,49 @@ class UIStylesMixin:
             rowheight=32,
             bordercolor=C_BORDER,
             lightcolor=C_PANEL,
-            darkcolor=C_PANEL
+            darkcolor=C_PANEL,
         )
-        s.configure(
+        style.configure(
             "Keeper.Treeview.Heading",
             background=C_PANEL_2,
             foreground=C_TEXT,
             font=("Segoe UI Semibold", 10),
-            relief="flat"
+            relief="flat",
         )
-        s.map(
+        style.map(
             "Keeper.Treeview",
             background=[("selected", C_SELECTED)],
-            foreground=[("selected", C_TEXT)]
+            foreground=[("selected", C_TEXT)],
         )
 
-        s.configure(
+        style.configure(
             "CardTitle.TLabel",
             background=C_CARD,
             foreground=C_TEXT,
-            font=("Segoe UI Semibold", 11)
+            font=("Segoe UI Semibold", 11),
         )
-        s.configure(
+        style.configure(
             "CardMuted.TLabel",
             background=C_CARD,
             foreground=C_MUTED,
-            font=("Segoe UI", 9)
+            font=("Segoe UI", 9),
         )
-        s.configure(
+        style.configure(
             "Metric.TLabel",
             background=C_CARD,
             foreground=C_ACCENT,
-            font=("Segoe UI Semibold", 18)
+            font=("Segoe UI Semibold", 18),
         )
-        s.configure(
+        style.configure(
             "Toolbar.TButton",
             background=C_CARD_ALT,
             foreground=C_TEXT,
             bordercolor=C_BORDER,
             font=("Segoe UI", 9),
-            padding=(10, 6)
+            padding=(10, 6),
         )
-        s.map(
+        style.map(
             "Toolbar.TButton",
             background=[("active", "#353535"), ("disabled", C_CARD)],
-            foreground=[("disabled", "#707070")]
+            foreground=[("disabled", "#707070")],
         )
