@@ -35,11 +35,45 @@ jobs:
           $main = (git rev-parse origin/main).Trim()
           if ($head -ne $env:EXPECTED_SHA) { throw "Release checkout is not the tested commit." }
           if ($main -ne $env:EXPECTED_SHA) { throw "main moved after qualification; refusing stale publication." }
-          $version = python -c "from keeper_group_export.common import APP_VERSION; print(APP_VERSION)"
-          $version = $version.Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid APP_VERSION: $version" }
+          $match = Select-String -Path 'keeper_group_export/common.py' -Pattern '^APP_VERSION = "(\d+\.\d+\.\d+)"
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build release ZIP and SHA-256
+        shell: pwsh
+        run: |
+          $zip = "Keeper-Group-Export-v$env:VERSION.zip"
+          $sha = "$zip.sha256"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path @(
+            'Keeper-Group-Export.pyw',
+            'Keeper-Group-Export-Bootstrap.ps1',
+            'Start Keeper Group Export.vbs',
+            'README.md',
+            'requirements.txt',
+            'keeper_group_export'
+          ) -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -NoNewline -Encoding ascii $sha
+          if ((Get-Item $zip).Length -le 0) { throw 'Release ZIP is empty' }
+          Get-Content $sha
+
+      - name: Publish immutable GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = "v$env:VERSION"
+          $existing = (& gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | ConvertFrom-Json | Where-Object { $_.tagName -eq $tag })
+          if ($existing) { throw "$tag already exists; releases are immutable" }
+          $zip = "Keeper-Group-Export-v$env:VERSION.zip"
+          $sha = "$zip.sha256"
+          gh release create $tag $zip $sha --target $env:EXPECTED_SHA --title "Keeper Group Export $env:VERSION" --notes "Hosted CI-qualified Keeper Group Export $env:VERSION release."
+
+          if (-not $match) { throw 'Could not resolve APP_VERSION from common.py' }
+          $version = $match.Matches[0].Groups[1].Value
           $subject = (git log -1 --format=%s).Trim()
-          if (-not ($subject -eq "Release $version" -or $subject.StartsWith("Release $version:"))) {
+          if (-not ($subject -eq "Release $version" -or $subject.StartsWith("Release ${version}:"))) {
             throw "Release commit must begin with Release $version"
           }
           "VERSION=$version" >> $env:GITHUB_ENV
