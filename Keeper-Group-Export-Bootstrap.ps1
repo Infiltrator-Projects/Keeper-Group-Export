@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    First-run/repair bootstrap for Keeper Group Export 1.0.0.
+    First-run/repair bootstrap for Keeper Group Export 1.0.1.
 
 .DESCRIPTION
     This is intentionally the slow path. Normal launches use the runtime-v2

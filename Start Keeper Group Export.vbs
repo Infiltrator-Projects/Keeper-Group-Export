@@ -1,4 +1,4 @@
-' Keeper Group Export 1.0.0 - fast launcher
+' Keeper Group Export 1.0.1 - fast launcher
 ' ========================================
 '
 ' Normal startup is intentionally just cached pythonw.exe -> GUI. PowerShell,

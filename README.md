@@ -4,7 +4,7 @@ Keeper Group Export is a Windows GUI utility for exporting credential records fr
 
 ## Download
 
-The current stable release is **v1.0.0**. Download the packaged ZIP and its SHA-256 checksum from GitHub Releases.
+The current stable release is **v1.0.1**. Download the packaged ZIP and its SHA-256 checksum from GitHub Releases.
 
 ## Run
 
