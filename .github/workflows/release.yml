@@ -1,0 +1,76 @@
+name: Keeper Group Export Release
+
+on:
+  workflow_run:
+    workflows: ["Keeper Group Export CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      startsWith(github.event.workflow_run.head_commit.message, 'Release ')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Check out exact tested release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify exact current main and release identity
+        shell: pwsh
+        run: |
+          git fetch origin main --tags
+          $head = (git rev-parse HEAD).Trim()
+          $main = (git rev-parse origin/main).Trim()
+          if ($head -ne $env:EXPECTED_SHA) { throw "Release checkout is not the tested commit." }
+          if ($main -ne $env:EXPECTED_SHA) { throw "main moved after qualification; refusing stale publication." }
+          $version = python -c "from keeper_group_export.common import APP_VERSION; print(APP_VERSION)"
+          $version = $version.Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid APP_VERSION: $version" }
+          $subject = (git log -1 --format=%s).Trim()
+          if (-not ($subject -eq "Release $version" -or $subject.StartsWith("Release $version:"))) {
+            throw "Release commit must begin with Release $version"
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build release ZIP and SHA-256
+        shell: pwsh
+        run: |
+          $zip = "Keeper-Group-Export-v$env:VERSION.zip"
+          $sha = "$zip.sha256"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path @(
+            'Keeper-Group-Export.pyw',
+            'Keeper-Group-Export-Bootstrap.ps1',
+            'Start Keeper Group Export.vbs',
+            'README.md',
+            'requirements.txt',
+            'keeper_group_export'
+          ) -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -NoNewline -Encoding ascii $sha
+          if ((Get-Item $zip).Length -le 0) { throw 'Release ZIP is empty' }
+          Get-Content $sha
+
+      - name: Publish immutable GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = "v$env:VERSION"
+          if (gh release view $tag 2>$null) { throw "$tag already exists; releases are immutable" }
+          $zip = "Keeper-Group-Export-v$env:VERSION.zip"
+          $sha = "$zip.sha256"
+          gh release create $tag $zip $sha --target $env:EXPECTED_SHA --title "Keeper Group Export $env:VERSION" --notes "Hosted CI-qualified Keeper Group Export $env:VERSION release."
