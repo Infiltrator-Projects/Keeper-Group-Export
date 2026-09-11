@@ -13,6 +13,8 @@ from .common import (
     C_PANEL,
     C_SELECTED,
     C_TEXT,
+    FONT_BRAND,
+    FONT_UI,
 )
 
 
@@ -42,7 +44,7 @@ class AuthPresentationMixin:
 
         badge = tk.Canvas(card, width=54, height=54, bg=C_PANEL, highlightthickness=0)
         badge.create_oval(2, 2, 52, 52, fill=C_ACCENT, outline=C_ACCENT)
-        badge.create_text(27, 27, text="K", fill="#111111", font=("Segoe UI Black", 23))
+        badge.create_text(27, 27, text="K", fill="#111111", font=(FONT_BRAND, 23))
         badge.pack(pady=(24, 8))
 
         tk.Label(
@@ -50,7 +52,7 @@ class AuthPresentationMixin:
             text="Sign in to Keeper",
             bg=C_PANEL,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 16),
+            font=(FONT_BRAND, 16),
         ).pack()
 
         self.login_hint = tk.Label(
@@ -62,14 +64,14 @@ class AuthPresentationMixin:
             ),
             bg=C_PANEL,
             fg=C_MUTED,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
         )
         self.login_hint.pack(pady=(4, 16))
 
         form = tk.Frame(card, bg=C_PANEL)
         form.pack(fill="x", padx=36)
 
-        tk.Label(form, text="Email", bg=C_PANEL, fg=C_MUTED, font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(form, text="Email", bg=C_PANEL, fg=C_MUTED, font=(FONT_UI, 9)).pack(anchor="w")
         self.login_user_var = tk.StringVar(value=self.last_user)
         user_entry = tk.Entry(
             form,
@@ -81,7 +83,7 @@ class AuthPresentationMixin:
             highlightthickness=1,
             highlightbackground=C_BORDER,
             highlightcolor=C_ACCENT,
-            font=("Segoe UI", 10),
+            font=(FONT_UI, 10),
         )
         user_entry.pack(fill="x", ipady=8, pady=(4, 10))
 
@@ -90,7 +92,7 @@ class AuthPresentationMixin:
             text="Master password",
             bg=C_PANEL,
             fg=C_MUTED,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
         ).pack(anchor="w")
         self.login_password_var = tk.StringVar()
         pass_entry = tk.Entry(
@@ -104,7 +106,7 @@ class AuthPresentationMixin:
             highlightthickness=1,
             highlightbackground=C_BORDER,
             highlightcolor=C_ACCENT,
-            font=("Segoe UI", 10),
+            font=(FONT_UI, 10),
         )
         pass_entry.pack(fill="x", ipady=8, pady=(4, 14))
 
@@ -117,7 +119,7 @@ class AuthPresentationMixin:
             activeforeground="#111111",
             relief="flat",
             bd=0,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
             command=self._start_connect_from_login,
             state="disabled" if not self.runtime_ready else "normal",
         )
@@ -128,7 +130,7 @@ class AuthPresentationMixin:
             text="",
             bg=C_PANEL,
             fg=C_DANGER,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
             wraplength=395,
             justify="left",
             anchor="n",
@@ -179,7 +181,7 @@ class AuthPresentationMixin:
             text=prompt,
             bg=C_PANEL,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
             justify="left",
             wraplength=430,
         ).pack(fill="x", padx=18, pady=(18, 10))
@@ -194,7 +196,7 @@ class AuthPresentationMixin:
             relief="flat",
             highlightthickness=1,
             highlightbackground=C_BORDER,
-            font=("Segoe UI", 10),
+            font=(FONT_UI, 10),
             activestyle="none",
         )
         listbox.pack(fill="both", expand=True, padx=18)
@@ -224,11 +226,11 @@ class AuthPresentationMixin:
             command=cancel,
             bg=C_INPUT,
             fg=C_TEXT,
-            activebackground="#474747",
+            activebackground="#171b20",
             activeforeground=C_TEXT,
             relief="flat",
             bd=0,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             padx=16,
             pady=7,
         ).pack(side="right")
@@ -243,7 +245,7 @@ class AuthPresentationMixin:
             activeforeground="#111111",
             relief="flat",
             bd=0,
-            font=("Segoe UI Semibold", 9),
+            font=(FONT_UI, 9, "bold"),
             padx=16,
             pady=7,
         ).pack(side="right", padx=(0, 8))
