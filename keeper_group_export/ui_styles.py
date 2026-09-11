@@ -15,12 +15,14 @@ from .common import (
     C_PANEL_2,
     C_SELECTED,
     C_TEXT,
+    FONT_BRAND,
+    FONT_UI,
 )
 
 
 class UIStylesMixin:
     def _build_styles(self):
-        """Configure the deterministic Keeper-inspired ttk presentation."""
+        """Configure the deterministic Keeper/Infiltrator ttk presentation."""
         style = ttk.Style(self)
         try:
             style.theme_use("clam")
@@ -31,11 +33,11 @@ class UIStylesMixin:
         style.configure("Keeper.TFrame", background=C_BG)
         style.configure("Panel.TFrame", background=C_PANEL)
         style.configure("Panel2.TFrame", background=C_PANEL_2)
-        style.configure("Keeper.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI", 10))
-        style.configure("Title.TLabel", background=C_BG, foreground=C_TEXT, font=("Segoe UI Semibold", 19))
-        style.configure("Section.TLabel", background=C_PANEL, foreground=C_TEXT, font=("Segoe UI Semibold", 11))
-        style.configure("Muted.TLabel", background=C_BG, foreground=C_MUTED, font=("Segoe UI", 9))
-        style.configure("PanelMuted.TLabel", background=C_PANEL, foreground=C_MUTED, font=("Segoe UI", 9))
+        style.configure("Keeper.TLabel", background=C_BG, foreground=C_TEXT, font=(FONT_UI, 10))
+        style.configure("Title.TLabel", background=C_BG, foreground=C_TEXT, font=(FONT_BRAND, 19))
+        style.configure("Section.TLabel", background=C_PANEL, foreground=C_TEXT, font=(FONT_UI, 11, "bold"))
+        style.configure("Muted.TLabel", background=C_BG, foreground=C_MUTED, font=(FONT_UI, 9))
+        style.configure("PanelMuted.TLabel", background=C_PANEL, foreground=C_MUTED, font=(FONT_UI, 9))
 
         style.configure(
             "Accent.TButton",
@@ -44,7 +46,7 @@ class UIStylesMixin:
             bordercolor=C_ACCENT,
             lightcolor=C_ACCENT,
             darkcolor=C_ACCENT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
             padding=(14, 8),
         )
         style.map(
@@ -58,12 +60,12 @@ class UIStylesMixin:
             background=C_INPUT,
             foreground=C_TEXT,
             bordercolor=C_BORDER,
-            font=("Segoe UI", 10),
+            font=(FONT_UI, 10),
             padding=(12, 8),
         )
         style.map(
             "Dark.TButton",
-            background=[("active", "#474747"), ("disabled", "#2d2d2d")],
+            background=[("active", C_CARD_ALT), ("disabled", C_PANEL_2)],
             foreground=[("disabled", "#777777")],
         )
 
@@ -77,6 +79,7 @@ class UIStylesMixin:
             lightcolor=C_BORDER,
             darkcolor=C_BORDER,
             padding=6,
+            font=(FONT_UI, 10),
         )
         style.map(
             "Keeper.TCombobox",
@@ -95,12 +98,13 @@ class UIStylesMixin:
             bordercolor=C_BORDER,
             lightcolor=C_PANEL,
             darkcolor=C_PANEL,
+            font=(FONT_UI, 10),
         )
         style.configure(
             "Keeper.Treeview.Heading",
             background=C_PANEL_2,
             foreground=C_TEXT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
             relief="flat",
         )
         style.map(
@@ -113,30 +117,30 @@ class UIStylesMixin:
             "CardTitle.TLabel",
             background=C_CARD,
             foreground=C_TEXT,
-            font=("Segoe UI Semibold", 11),
+            font=(FONT_UI, 11, "bold"),
         )
         style.configure(
             "CardMuted.TLabel",
             background=C_CARD,
             foreground=C_MUTED,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
         )
         style.configure(
             "Metric.TLabel",
             background=C_CARD,
             foreground=C_ACCENT,
-            font=("Segoe UI Semibold", 18),
+            font=(FONT_UI, 18, "bold"),
         )
         style.configure(
             "Toolbar.TButton",
             background=C_CARD_ALT,
             foreground=C_TEXT,
             bordercolor=C_BORDER,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9, "bold"),
             padding=(10, 6),
         )
         style.map(
             "Toolbar.TButton",
-            background=[("active", "#353535"), ("disabled", C_CARD)],
+            background=[("active", C_PANEL_2), ("disabled", C_CARD)],
             foreground=[("disabled", "#707070")],
         )
