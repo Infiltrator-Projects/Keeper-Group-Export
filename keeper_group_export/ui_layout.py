@@ -15,6 +15,8 @@ from .common import (
     C_SIDEBAR,
     C_TEXT,
     C_WARNING,
+    FONT_BRAND,
+    FONT_UI,
 )
 
 
@@ -39,7 +41,7 @@ class UILayoutMixin:
 
         badge = tk.Canvas(brand, width=38, height=38, bg=C_SIDEBAR, highlightthickness=0)
         badge.create_oval(2, 2, 36, 36, fill=C_ACCENT, outline=C_ACCENT)
-        badge.create_text(19, 19, text="K", fill="#111111", font=("Segoe UI Black", 16))
+        badge.create_text(19, 19, text="K", fill="#111111", font=(FONT_BRAND, 16))
         badge.pack(side="left")
 
         brand_text = tk.Frame(brand, bg=C_SIDEBAR)
@@ -49,15 +51,15 @@ class UILayoutMixin:
             text="KEEPER",
             bg=C_SIDEBAR,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 14),
+            font=(FONT_BRAND, 14),
             anchor="w",
         ).pack(anchor="w")
         tk.Label(
             brand_text,
             text="GROUP EXPORT",
             bg=C_SIDEBAR,
-            fg="#8f8f8f",
-            font=("Segoe UI", 7),
+            fg="#899198",
+            font=(FONT_UI, 7, "bold"),
             anchor="w",
         ).pack(anchor="w")
 
@@ -65,20 +67,20 @@ class UILayoutMixin:
             sidebar,
             text="WORKSPACE",
             bg=C_SIDEBAR,
-            fg="#707070",
-            font=("Segoe UI Semibold", 7),
+            fg="#899198",
+            font=(FONT_UI, 7, "bold"),
             anchor="w",
         ).pack(fill="x", padx=22, pady=(8, 6))
 
-        export_nav = tk.Frame(sidebar, bg="#2c2c2c", height=42)
+        export_nav = tk.Frame(sidebar, bg="#171b20", height=42)
         export_nav.pack(fill="x", padx=10)
         export_nav.pack_propagate(False)
         tk.Label(
             export_nav,
             text="  ▣  Group Export",
-            bg="#2c2c2c",
+            bg="#171b20",
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 9),
+            font=(FONT_UI, 9, "bold"),
             anchor="w",
         ).pack(fill="both", expand=True)
 
@@ -88,11 +90,11 @@ class UILayoutMixin:
             command=self.show_about,
             bg=C_SIDEBAR,
             fg=C_MUTED,
-            activebackground="#242424",
+            activebackground="#101318",
             activeforeground=C_TEXT,
             relief="flat",
             bd=0,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             anchor="w",
             padx=11,
             pady=10,
@@ -106,16 +108,16 @@ class UILayoutMixin:
             footer,
             text=f"Version {APP_VERSION}",
             bg=C_SIDEBAR,
-            fg="#727272",
-            font=("Segoe UI", 8),
+            fg="#899198",
+            font=(FONT_UI, 8),
             anchor="w",
         ).pack(anchor="w")
         tk.Label(
             footer,
             text="Shannon Smith • Carlo Cunanan",
             bg=C_SIDEBAR,
-            fg="#727272",
-            font=("Segoe UI", 7),
+            fg="#899198",
+            font=(FONT_UI, 7),
             anchor="w",
         ).pack(anchor="w", pady=(2, 0))
 
@@ -133,7 +135,7 @@ class UILayoutMixin:
             text=APP_TITLE,
             bg=C_BG,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 21),
+            font=(FONT_BRAND, 21),
             anchor="w",
         ).pack(anchor="w")
         tk.Label(
@@ -141,22 +143,22 @@ class UILayoutMixin:
             text="Export selected Keeper folders to a clean, parent-ready credential CSV.",
             bg=C_BG,
             fg=C_MUTED,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             anchor="w",
         ).pack(anchor="w", pady=(3, 0))
 
         self.account_badge = tk.Label(
             header,
             text="Not connected",
-            bg="#202020",
+            bg="#101318",
             fg=C_MUTED,
-            font=("Segoe UI Semibold", 8),
+            font=(FONT_UI, 8, "bold"),
             padx=12,
             pady=7,
         )
         self.account_badge.pack(side="right", padx=(10, 0))
 
-        tk.Frame(self.main, bg="#313131", height=1).pack(
+        tk.Frame(self.main, bg=C_BORDER, height=1).pack(
             fill="x", padx=28, pady=(0, 18)
         )
 
@@ -167,7 +169,7 @@ class UILayoutMixin:
         status_card = tk.Frame(
             content,
             bg=C_CARD,
-            highlightbackground="#353535",
+            highlightbackground=C_BORDER,
             highlightthickness=1,
         )
         status_card.pack(fill="x", pady=(0, 12))
@@ -191,7 +193,7 @@ class UILayoutMixin:
             text="Vault connection",
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
         ).pack(side="left")
 
         self.conn_status = tk.Label(
@@ -199,7 +201,7 @@ class UILayoutMixin:
             text="Preparing Keeper library…",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
             anchor="w",
         )
         self.conn_status.pack(anchor="w", pady=(5, 0))
@@ -227,7 +229,7 @@ class UILayoutMixin:
         group_card = tk.Frame(
             content,
             bg=C_CARD,
-            highlightbackground="#353535",
+            highlightbackground=C_BORDER,
             highlightthickness=1,
         )
         group_card.pack(fill="x", pady=(0, 12))
@@ -241,7 +243,7 @@ class UILayoutMixin:
             text="Keeper folder",
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
             anchor="w",
         ).pack(anchor="w")
         tk.Label(
@@ -249,7 +251,7 @@ class UILayoutMixin:
             text="Choose a live folder from the connected vault.",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
             anchor="w",
         ).pack(anchor="w", pady=(2, 8))
 
@@ -279,7 +281,7 @@ class UILayoutMixin:
             text="Connect to Keeper to load available folders.",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
             anchor="w",
         )
         self.folder_info.pack(anchor="w", pady=(7, 0))
@@ -292,7 +294,7 @@ class UILayoutMixin:
             text="—",
             bg=C_CARD,
             fg=C_ACCENT,
-            font=("Segoe UI Semibold", 20),
+            font=(FONT_UI, 20, "bold"),
         )
         self.metric_count.pack(anchor="e")
         tk.Label(
@@ -300,14 +302,14 @@ class UILayoutMixin:
             text="records",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
         ).pack(anchor="e")
 
         # Preview ----------------------------------------------------------
         preview = tk.Frame(
             content,
             bg=C_CARD,
-            highlightbackground="#353535",
+            highlightbackground=C_BORDER,
             highlightthickness=1,
         )
         preview.pack(fill="both", expand=True, pady=(0, 12))
@@ -321,21 +323,21 @@ class UILayoutMixin:
             text="Credential preview",
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 10),
+            font=(FONT_UI, 10, "bold"),
         ).pack(anchor="w")
         self.preview_count = tk.Label(
             preview_title,
             text="",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
         )
         self.preview_count.pack(anchor="w", pady=(2, 0))
 
         tools = tk.Frame(preview_header, bg=C_CARD)
         tools.pack(side="right")
         tk.Label(
-            tools, text="Search", bg=C_CARD, fg=C_MUTED, font=("Segoe UI", 8)
+            tools, text="Search", bg=C_CARD, fg=C_MUTED, font=(FONT_UI, 8)
         ).pack(side="left", padx=(0, 6))
         self.search_entry = tk.Entry(
             tools,
@@ -347,7 +349,7 @@ class UILayoutMixin:
             highlightthickness=1,
             highlightbackground=C_BORDER,
             highlightcolor=C_ACCENT,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             width=24,
         )
         self.search_entry.pack(side="left")
@@ -361,7 +363,7 @@ class UILayoutMixin:
             activebackground=C_CARD,
             activeforeground=C_TEXT,
             selectcolor=C_INPUT,
-            font=("Segoe UI", 8),
+            font=(FONT_UI, 8),
             padx=10,
         )
         self.hide_passwords_check.pack(side="left")
@@ -397,8 +399,8 @@ class UILayoutMixin:
             bottom,
             text="Ready",
             bg=C_BG,
-            fg="#858585",
-            font=("Segoe UI", 8),
+            fg="#899198",
+            font=(FONT_UI, 8),
             anchor="w",
         )
         self.footer_status.pack(side="left")
@@ -406,8 +408,8 @@ class UILayoutMixin:
             bottom,
             text="Ctrl+F Search   •   F5 Refresh   •   Ctrl+E Export   •   F1 About",
             bg=C_BG,
-            fg="#6f6f6f",
-            font=("Segoe UI", 8),
+            fg="#899198",
+            font=(FONT_UI, 8),
             anchor="e",
         ).pack(side="right")
 
