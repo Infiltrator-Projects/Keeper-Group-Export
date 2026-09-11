@@ -3,6 +3,11 @@
 This module is intentionally Python-only. It is not an embedded copy or binding
 of Infiltratr Common; the native C11 library currently exposes no supported
 Python consumer interface that would improve this utility.
+
+Graphical presentation follows the canonical Infiltrator Design v1 contract in
+Infiltrator-Libraries. MBLINK is the reference implementation; Keeper keeps its
+own yellow product accent while sharing the graphite/silver foundation and MB
+Corpo typography roles.
 """
 
 import re
@@ -13,23 +18,31 @@ APP_SUBTITLE = "Credential Export Utility"
 PROGRAMMERS = ("Shannon Smith", "Carlo Cunanan")
 KEEPER_COMMANDER_VERSION = "18.1.2"
 
-C_BG = "#171717"
-C_PANEL = "#242424"
-C_PANEL_2 = "#2d2d2d"
-C_INPUT = "#3a3a3a"
-C_BORDER = "#4a4a4a"
-C_TEXT = "#f3f3f3"
-C_MUTED = "#b6b6b6"
+# Infiltrator Design v1 typography. Tk falls back to its platform font mapper
+# automatically if these private/local faces are not installed.
+FONT_UI = "MB Corpo S Title WEB"
+FONT_BRAND = "MB Corpo A Title Cond WEB"
+FONT_UI_FALLBACK = "Segoe UI"
+
+# Infiltrator Design v1 graphite/silver structural palette. Keeper's yellow
+# accent remains product-owned.
+C_BG = "#050608"
+C_PANEL = "#101318"
+C_PANEL_2 = "#171b20"
+C_INPUT = "#0e1115"
+C_BORDER = "#353a40"
+C_TEXT = "#e8ecef"
+C_MUTED = "#aeb6bd"
 C_ACCENT = "#ffcc00"
 C_ACCENT_HOVER = "#ffd633"
-C_DANGER = "#e05454"
-C_SELECTED = "#555555"
-C_SIDEBAR = "#101010"
-C_CARD = "#222222"
-C_CARD_ALT = "#292929"
-C_SUCCESS = "#62d26f"
-C_WARNING = "#f0b94d"
-C_INFO = "#62a8ff"
+C_DANGER = "#c96b6b"
+C_SELECTED = "#2b3137"
+C_SIDEBAR = "#050608"
+C_CARD = "#171b20"
+C_CARD_ALT = "#0d1014"
+C_SUCCESS = "#63ab7c"
+C_WARNING = "#d19e47"
+C_INFO = "#7fa7c9"
 
 
 def safe_filename(text):
@@ -78,4 +91,3 @@ def build_folder_record_index(folder_cache, direct_record_cache):
         collect(uid)
 
     return memo
-
