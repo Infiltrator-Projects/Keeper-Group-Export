@@ -15,6 +15,8 @@ from .common import (
     C_MUTED,
     C_SUCCESS,
     C_TEXT,
+    FONT_BRAND,
+    FONT_UI,
     KEEPER_COMMANDER_VERSION,
     PROGRAMMERS,
 )
@@ -79,14 +81,14 @@ class UIActionsMixin:
         card = tk.Frame(
             win,
             bg=C_CARD,
-            highlightbackground="#3b3b3b",
+            highlightbackground="#353a40",
             highlightthickness=1,
         )
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         badge = tk.Canvas(card, width=62, height=62, bg=C_CARD, highlightthickness=0)
         badge.create_oval(3, 3, 59, 59, fill=C_ACCENT, outline=C_ACCENT)
-        badge.create_text(31, 31, text="K", fill="#111111", font=("Segoe UI Black", 25))
+        badge.create_text(31, 31, text="K", fill="#111111", font=(FONT_BRAND, 25))
         badge.pack(pady=(22, 8))
 
         tk.Label(
@@ -94,7 +96,7 @@ class UIActionsMixin:
             text=APP_TITLE,
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI Semibold", 18),
+            font=(FONT_BRAND, 18),
         ).pack()
 
         tk.Label(
@@ -102,7 +104,7 @@ class UIActionsMixin:
             text=f"{APP_SUBTITLE}  •  Version {APP_VERSION}",
             bg=C_CARD,
             fg=C_MUTED,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
         ).pack(pady=(4, 16))
 
         body = tk.Frame(card, bg=C_CARD)
@@ -116,19 +118,19 @@ class UIActionsMixin:
             ),
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             justify="left",
             wraplength=470,
         ).pack(anchor="w")
 
-        tk.Frame(body, bg="#3a3a3a", height=1).pack(fill="x", pady=16)
+        tk.Frame(body, bg="#353a40", height=1).pack(fill="x", pady=16)
 
         tk.Label(
             body,
             text="PROGRAMMERS",
             bg=C_CARD,
-            fg="#7f7f7f",
-            font=("Segoe UI Semibold", 7),
+            fg="#899198",
+            font=(FONT_UI, 7, "bold"),
         ).pack(anchor="w")
 
         tk.Label(
@@ -136,7 +138,7 @@ class UIActionsMixin:
             text="\n".join(f"• {name}" for name in PROGRAMMERS),
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
             justify="left",
         ).pack(anchor="w", pady=(5, 0))
 
@@ -144,8 +146,8 @@ class UIActionsMixin:
             body,
             text="TECHNOLOGY",
             bg=C_CARD,
-            fg="#7f7f7f",
-            font=("Segoe UI Semibold", 7),
+            fg="#899198",
+            font=(FONT_UI, 7, "bold"),
         ).pack(anchor="w", pady=(14, 0))
 
         tk.Label(
@@ -153,7 +155,7 @@ class UIActionsMixin:
             text=f"Python 3.13 • Tkinter • Keeper Commander {KEEPER_COMMANDER_VERSION}",
             bg=C_CARD,
             fg=C_TEXT,
-            font=("Segoe UI", 9),
+            font=(FONT_UI, 9),
         ).pack(anchor="w", pady=(5, 0))
 
         tk.Label(
@@ -163,8 +165,8 @@ class UIActionsMixin:
                 "of Keeper Security, Inc."
             ),
             bg=C_CARD,
-            fg="#777777",
-            font=("Segoe UI", 8),
+            fg="#899198",
+            font=(FONT_UI, 8),
             justify="left",
             wraplength=470,
         ).pack(anchor="w", pady=(16, 0))
@@ -179,7 +181,7 @@ class UIActionsMixin:
             activeforeground="#111111",
             relief="flat",
             bd=0,
-            font=("Segoe UI Semibold", 9),
+            font=(FONT_UI, 9, "bold"),
             padx=20,
             pady=8,
         ).pack(pady=22)
